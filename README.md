@@ -1,4 +1,4 @@
-KaggleLab
+Kaggle Lab
 =========
 
-Experiments in Kaggle Competitions
+Repo for my Kaggle competitions experiments
