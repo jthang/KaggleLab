@@ -2,7 +2,7 @@ from collections import namedtuple, defaultdict
 import csv
 import os
 
-from tansformation import StatelessTransform
+from transformations import StatelessTransform
 from settings import DATA_PATH
 
 #Harvard Inquirer
@@ -55,17 +55,18 @@ class InquirerLexTransform(StatelessTransform):
         "To cache a dictionary with the HIL corpus"
         if not self._corpus:
             corpus = defaultdict(list)
-            it = csv.reader(open(os.path.join(DATA_PATH, "inquirerbasictabsclean")),
+            it = csv.reader(open(os.path.join(DATA_PATH, "inquirerbasicttabsclean")),
                             delimiter="\t")
-            next(it)
+            next(it)  # Drop header row
             for row in it:
                 entry = InquirerLexEntry(*row)
+                xs = []
                 for i in self._use_fields:
                     name, x = FIELDS[i], entry[i]
                     if x:
                         xs.append("{}_{}".format(name, x))
                 name = entry.Entry.lower()
-                for "#" in name:
+                if "#" in name:
                     name = name[:name.index("#")]
                 corpus[name].extend(xs)
             self._corpus.append(dict(corpus))

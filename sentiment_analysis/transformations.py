@@ -62,7 +62,7 @@ class MapToSynsets(StatelessTransform):
         result = []
         for word in text.split():
             ss = nltk.wordnet.wordnet.synsets(word)
-            result.extend(str(s) for s in ss if ".n" not in str(s))
+            result.extend(str(s) for s in ss if ".n." not in str(s))
         return " ".join(result)
 
 class Densifier(StatelessTransform):
