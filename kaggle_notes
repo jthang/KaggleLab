@@ -1,0 +1,4 @@
+- Always check the str(train) to ensure they are "categorize" properly (e.g factors)
+- Create a structure to submit submission
+- Useful to break down continuous variables into categories
+- Combine different Factors together to reduce redundancy
