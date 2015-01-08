@@ -4,6 +4,8 @@ library(rpart)
 library(rattle)
 library(rpart.plot)
 library(RColorBrewer)
+library(randomForest)
+library(party)
 
 # Load data
 train <- read.csv("./data//train.csv")
@@ -12,6 +14,7 @@ test <- read.csv("./data//test.csv")
 head(train)
 .Last.value %>% View() #View more data
 
+#Fitting by analzying data -------------------------------------------------------------------
 # Examine Gender structure
 str(train)
 summary(train$Sex)
@@ -46,7 +49,7 @@ test$Survived[test$Sex == 'female'] <- 1 #Assign female 1
 test$Survived[test$Sex == 'female' & test$Fare == 3 & test$Fare >= 20] <- 1
 head(test)
 
-#Decision Trees -----------------
+#Decision Trees -----------------------------------------------------------------------------------------
 #Create the gender model
 fit <- rpart(Survived ~ Sex, train, method='class') #class is for categories. anova for continuous variable
 fancyRpartPlot(fit)
@@ -64,6 +67,7 @@ plot(fit)
 text(fit)
 fancyRpartPlot(fit)
 
+#Feature Engineering ------------------------------------------------------------------------
 # Join test and train sets for feature engineering
 test$Survived <- NA
 combi <- rbind(train, test)
@@ -101,18 +105,61 @@ combi$FamilyID <- paste(as.character(combi$FamilySize), combi$Surname, sep='')
 combi$FamilyID[combi$FamilySize <= 2] <- 'Small'
 combi$FamilyID <- factor(combi$FamilyID)
 
-# Split back into Test and Train Sets
+famIDs <- data.frame(table(combi$FamilyID))
+
+#Filling in Missing Data -----------------------------------------------------------------------------
+
+#Find where are the missing data
+summary(combi)
+
+# Using ANOVA to replace missing data
+summary(combi$Age)
+Agefit <- rpart(Age ~ Pclass + Sex + SibSp + Parch + Fare + Embarked + Title + FamilySize, 
+                data=combi[!is.na(combi$Age),], method="anova")
+combi$Age[is.na(combi$Age)] <- predict(Agefit, combi[is.na(combi$Age),])
+
+# Hardcode missing data
+summary(combi$Embarked) #Found 2 missing data
+which(combi$Embarked == '') #list which are the 2 missing data
+combi$Embarked[c(62,830)] = "S"
+combi$Embarked <- factor(combi$Embarked)
+
+# Fill missing data with median
+summary(combi$Fare)
+which(combi$Fare == '')
+combi$Fare[1044] <- median(combi$Fare, na.rm=TRUE)
+
+# Reduce No. of Factors ------------------------------------------------------------------------------------------
+# R Random Forest can only take <32 levels, will have to reduce
+str(combi)
+combi$FamilyID2 <- combi$FamilyID
+combi$FamilyID2 <- as.character(combi$FamilyID2)
+combi$FamilyID2[combi$FamilySize <= 3] <- 'Small'
+combi$FamilyID2 <- factor(combi$FamilyID2)
+
+# Split back into Test and Train Sets ----------------------------------------------------------------
 train <- combi[1:891,]
 test <- combi[892:1309,]
 
-# Build new tree with new features
-fit <- rpart(Survived ~ Pclass + Sex + Age + SibSp + Parch + Fare + Embarked +  Title + FamilySize + FamilyID, 
-             data=train, method="class")
-fancyRpartPlot(fit)
+# Build Random Forest Ensemble
+set.seed(415)
+fit <- randomForest(as.factor(Survived) ~ Pclass + Sex + Age + SibSp + Parch + Fare + Embarked + Title + FamilySize + FamilyID2,
+                    data=train, importance=TRUE, ntree=2000)
 
-#Make Prediction
-Prediction <- predict(fit, test, type = "class")
+# Variable Importance
+varImpPlot(fit)
 
-#Submission File Output ----------------------------
+#Make Prediction and Submission File Output ----------------------------------------------------------------------------
+Prediction <- predict(fit, test)
 submit <- data.frame(PassengerId = test$PassengerId, Survived = Prediction)
-write.csv(submit, file = "submission_features.csv", row.names = FALSE)
+write.csv(submit, file = "firstforest.csv", row.names = FALSE)
+
+#Using Conditional Inference Forests -----------------------------------------------------------------------------
+set.seed(415)
+fit <- cforest(as.factor(Survived) ~ Pclass + Sex + Age + SibSp + Parch + Fare + Embarked + Title + FamilySize + FamilyID,
+               data = train, controls=cforest_unbiased(ntree=2000, mtry=3)) 
+
+Prediction <- predict(fit, test, OOB=TRUE, type = "response")
+submit <- data.frame(PassengerId = test$PassengerId, Survived = Prediction)
+write.csv(submit, file = "submission_forest_ci.csv", row.names = FALSE)
+
