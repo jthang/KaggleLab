@@ -2,3 +2,4 @@
 - Create a structure to submit submission
 - Useful to break down continuous variables into categories
 - Combine different Factors together to reduce redundancy
+- For missing data, we can fit using Anova to fill in missing data
